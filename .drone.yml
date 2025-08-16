@@ -1,0 +1,163 @@
+kind: pipeline
+name: default
+
+workspace:
+  path: /source
+
+environment:
+  IMAGE_NAME: baseline-node20-puppeteer
+  PUSHRM_SHORT: Node 20 with pnpm v10 and Puppeteer (Chromium).
+  COMMIT_TAG: ${DRONE_COMMIT_SHA:0:8}
+  VERSION_TAG: ${DRONE_SEMVER##v}
+  OFFICIAL_PREFIX: paperplanecc
+  P01_PREFIX: docker.p01.cc
+  P01_USERNAME: p01
+
+steps:
+  - name: buildx
+    image: docker:dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker buildx build --platform linux/amd64,linux/arm64 --progress plain --compress -t $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG .
+
+  - name: publish-p01
+    image: docker:dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      P01_DOCKER_PASSWORD:
+        from_secret: P01_DOCKER_PASSWORD
+    commands:
+      - docker login $P01_PREFIX -u $P01_USERNAME -p $P01_DOCKER_PASSWORD
+      - docker tag $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG $P01_PREFIX/$IMAGE_NAME:latest
+      - docker push $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG
+      - docker push $P01_PREFIX/$IMAGE_NAME:latest
+
+  - name: publish-p01-version
+    image: docker:dind
+    when:
+      event:
+        - tag
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      P01_DOCKER_PASSWORD:
+        from_secret: P01_DOCKER_PASSWORD
+    commands:
+      - docker login $P01_PREFIX -u $P01_USERNAME -p $P01_DOCKER_PASSWORD
+      - docker tag $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG $P01_PREFIX/$IMAGE_NAME:$VERSION_TAG
+      - docker push $P01_PREFIX/$IMAGE_NAME:$VERSION_TAG
+
+  - name: publish-official
+    image: docker:dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      DOCKER_PASSWORD:
+        from_secret: DOCKER_PASSWORD
+    commands:
+      - docker login -u $OFFICIAL_PREFIX -p $DOCKER_PASSWORD
+      - docker tag $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG $OFFICIAL_PREFIX/$IMAGE_NAME:$COMMIT_TAG
+      - docker tag $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG $OFFICIAL_PREFIX/$IMAGE_NAME:latest
+      - docker push $OFFICIAL_PREFIX/$IMAGE_NAME:$COMMIT_TAG
+      - docker push $OFFICIAL_PREFIX/$IMAGE_NAME:latest
+
+  - name: publish-official-version
+    image: docker:dind
+    when:
+      event:
+        - tag
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      DOCKER_PASSWORD:
+        from_secret: DOCKER_PASSWORD
+    commands:
+      - docker login -u $OFFICIAL_PREFIX -p $DOCKER_PASSWORD
+      - docker tag $OFFICIAL_PREFIX/$IMAGE_NAME:$COMMIT_TAG  $OFFICIAL_PREFIX/$IMAGE_NAME:$VERSION_TAG
+      - docker push $OFFICIAL_PREFIX/$IMAGE_NAME:$VERSION_TAG
+
+  - name: publish-official-readme
+    image: chko/docker-pushrm:1
+    environment:
+      DOCKER_PASSWORD:
+        from_secret: DOCKER_PASSWORD
+    commands:
+      - export DOCKER_USER="$OFFICIAL_PREFIX"
+      - export DOCKER_PASS="$DOCKER_PASSWORD"
+      - export PUSHRM_TARGET="docker.io/$OFFICIAL_PREFIX/$IMAGE_NAME"
+      - /docker-pushrm
+
+  - name: clean-p01
+    image: docker:dind
+    failure: ignore
+    when:
+      status:
+        - success
+        - failure
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker rmi $P01_PREFIX/$IMAGE_NAME:$COMMIT_TAG
+      - docker rmi $P01_PREFIX/$IMAGE_NAME:latest
+
+  - name: clean-p01-version
+    image: docker:dind
+    failure: ignore
+    when:
+      event:
+        - tag
+      status:
+        - success
+        - failure
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker rmi $P01_PREFIX/$IMAGE_NAME:$VERSION_TAG
+
+  - name: clean-official
+    image: docker:dind
+    failure: ignore
+    when:
+      status:
+        - success
+        - failure
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker rmi $OFFICIAL_PREFIX/$IMAGE_NAME:$COMMIT_TAG
+      - docker rmi $OFFICIAL_PREFIX/$IMAGE_NAME:latest
+
+  - name: clean-official-version
+    image: docker:dind
+    failure: ignore
+    when:
+      event:
+        - tag
+      status:
+        - success
+        - failure
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker rmi $OFFICIAL_PREFIX/$IMAGE_NAME:$VERSION_TAG
+
+trigger:
+  ref:
+    - refs/heads/master
+    - refs/tags/*
+
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
