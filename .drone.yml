@@ -6,7 +6,7 @@ workspace:
 
 environment:
   IMAGE_NAME: baseline-node20-puppeteer
-  PUSHRM_SHORT: Node 20 with pnpm v10 and Puppeteer (Chromium).
+  PUSHRM_SHORT: Node 20, pnpm v10, canvas and Puppeteer (Chromium).
   COMMIT_TAG: ${DRONE_COMMIT_SHA:0:8}
   VERSION_TAG: ${DRONE_SEMVER##v}
   OFFICIAL_PREFIX: paperplanecc

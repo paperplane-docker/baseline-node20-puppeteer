@@ -2,7 +2,7 @@
 
 本镜像 [`paperplanecc/baseline-node20-puppeteer`](https://hub.docker.com/r/paperplanecc/baseline-node20-puppeteer) 为 Node.js 和前端开发者提供预装可开箱即用 Puppeteer 的开发镜像。点此访问 [源码](https://git.paperplane.cc/paperplane-docker/baseline-node20-puppeteer) 或 [GitHub 源码镜像](https://github.com/paperplane-docker/baseline-node20-puppeteer)。
 
-镜像基于 `paperplanecc/baseline-node20`（也就是 `node:20-slim`），它已预装 `pnpm@^10`，预装 Chromium，并为 Puppeteer 配置了免下载和执行路径的环境变量。
+镜像基于 `paperplanecc/baseline-node20`（也就是 `node:20-slim`），它已预装 `pnpm@^10`，已预装 `canvas` 的相关依赖并开箱即用，预装 Chromium，并为 Puppeteer 配置了免下载和执行路径的环境变量。
 
 使用须知：
 
